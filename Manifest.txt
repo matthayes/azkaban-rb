@@ -1,0 +1,12 @@
+History.txt
+Manifest.txt
+PostInstall.txt
+README.rdoc
+Rakefile
+lib/azkaban-rb.rb
+lib/azkaban-job.rb
+script/console
+script/destroy
+script/generate
+test/test_azkaban-rb.rb
+test/test_helper.rb
