@@ -1,113 +1,109 @@
 require 'httpclient'
 
 module Azkaban
-
-  module Rb
     
-    def self.deploy(uri, path, zip_file)
-      client = HTTPClient.new
+  def self.deploy(uri, path, zip_file)
+    client = HTTPClient.new
 
-      client.send_timeout = 1200
+    client.send_timeout = 1200
 
-      File.open(zip_file) do |file|
-        body = { 'path' => path, 'file' => file }
-        puts "Uploading jobs ZIP file to #{uri}"
-        result = client.post(uri,body)
+    File.open(zip_file) do |file|
+      body = { 'path' => path, 'file' => file }
+      puts "Uploading jobs ZIP file to #{uri}"
+      result = client.post(uri,body)
 
-        # We expect to be redirected after uploading
-        raise "Error while uploading to Azkaban" if result.status != 302
+      # We expect to be redirected after uploading
+      raise "Error while uploading to Azkaban" if result.status != 302
 
-        location = result.header["Location"][0]
+      location = result.header["Location"][0]
 
-        success = /Installation Succeeded/
-        failure = /Installation Failed:\s*(.+)/
+      success = /Installation Succeeded/
+      failure = /Installation Failed:\s*(.+)/
 
-        if location =~ success
-          puts "Successfully uploaded to Azkaban"
-        elsif (m = failure.match(location))
-          reason = m[1]
-          raise "Failed to upload to Azkaban: #{reason}"
-        else
-          raise "Failed to upload to Azkaban for unknown reason"
-        end     
-      end
-    end
-
-    # custom MIME type handler so ZIP is uploaded as 'application/zip' as required by Azkaban UI
-    def self.mime_type_handler(path)
-      case path
-      when /\.txt$/i
-        'text/plain'
-      when /\.zip$/i
-        'application/zip'
-      when /\.(htm|html)$/i
-        'text/html'
-      when /\.doc$/i
-        'application/msword'
-      when /\.png$/i
-        'image/png'
-      when /\.gif$/i
-        'image/gif'
-      when /\.(jpg|jpeg)$/i
-        'image/jpeg'
+      if location =~ success
+        puts "Successfully uploaded to Azkaban"
+      elsif (m = failure.match(location))
+        reason = m[1]
+        raise "Failed to upload to Azkaban: #{reason}"
       else
-        'application/octet-stream'
-      end
+        raise "Failed to upload to Azkaban for unknown reason"
+      end     
     end
-  
-    # register our custom MIME handler
-    HTTP::Message.mime_type_handler = Proc.new { |path| Azkaban::Rb::mime_type_handler(path) }
+  end
 
-    class JobFile
-  
-      @output_dir = "conf/"
-  
-      def initialize(task, ext)
-        @task = task
-        @ext = ext
-        @args = {}
-      end
-  
-      class << self
-        attr_accessor :output_dir
-      end
-  
-      def set(params)
-        params.each do |k,v|
-          @args[k] = v
-        end
-      end
+  # custom MIME type handler so ZIP is uploaded as 'application/zip' as required by Azkaban UI
+  def self.mime_type_handler(path)
+    case path
+    when /\.txt$/i
+      'text/plain'
+    when /\.zip$/i
+      'application/zip'
+    when /\.(htm|html)$/i
+      'text/html'
+    when /\.doc$/i
+      'application/msword'
+    when /\.png$/i
+      'image/png'
+    when /\.gif$/i
+      'image/gif'
+    when /\.(jpg|jpeg)$/i
+      'image/jpeg'
+    else
+      'application/octet-stream'
+    end
+  end
 
-      def write
-        if @args.size > 0
-          file_name = @task.name.gsub(":", "-") + @ext
-          if @task.prerequisites.size > 0
-            scope = @task.scope.map { |s| s.to_s }.join("-")
-            @args["dependencies"] = @task.prerequisites.map{ |p| 
-              # look up the prerequisite in the scope of its task
-              prereq_task = Rake.application.lookup(p, @task.scope)
-              prereq_task.name.gsub(":", "-")
-            }.join(",")
-          end
-          create_properties_file(file_name, @args)
-          puts "Created #{file_name}"
-        end
-      end
-  
-      private 
-  
-      def create_properties_file(file_name, props)
-        unless File.exists? Azkaban::Rb::JobFile.output_dir
-          Dir.mkdir Azkaban::Rb::JobFile.output_dir
-        end
-        file = File.new(Azkaban::Rb::JobFile.output_dir + file_name, "w+")
-        props.each do |k,v|
-          file.write("#{k}=#{v}\n")
-        end
-        file.close
+  # register our custom MIME handler
+  HTTP::Message.mime_type_handler = Proc.new { |path| Azkaban::mime_type_handler(path) }
+
+  class JobFile
+
+    @output_dir = "conf/"
+
+    def initialize(task, ext)
+      @task = task
+      @ext = ext
+      @args = {}
+    end
+
+    class << self
+      attr_accessor :output_dir
+    end
+
+    def set(params)
+      params.each do |k,v|
+        @args[k] = v
       end
     end
 
+    def write
+      if @args.size > 0
+        file_name = @task.name.gsub(":", "-") + @ext
+        if @task.prerequisites.size > 0
+          scope = @task.scope.map { |s| s.to_s }.join("-")
+          @args["dependencies"] = @task.prerequisites.map{ |p| 
+            # look up the prerequisite in the scope of its task
+            prereq_task = Rake.application.lookup(p, @task.scope)
+            prereq_task.name.gsub(":", "-")
+          }.join(",")
+        end
+        create_properties_file(file_name, @args)
+        puts "Created #{file_name}"
+      end
+    end
+
+    private 
+
+    def create_properties_file(file_name, props)
+      unless File.exists? Azkaban::JobFile.output_dir
+        Dir.mkdir Azkaban::JobFile.output_dir
+      end
+      file = File.new(Azkaban::JobFile.output_dir + file_name, "w+")
+      props.each do |k,v|
+        file.write("#{k}=#{v}\n")
+      end
+      file.close
+    end
   end
 
 end
@@ -115,7 +111,7 @@ end
 def props(*args, &b)
   task(*args) do |t|
     unless b.nil?
-      job = Azkaban::Rb::JobFile.new(t, ".properties")
+      job = Azkaban::JobFile.new(t, ".properties")
       job.instance_eval(&b)
       job.write
     end
@@ -125,7 +121,7 @@ end
 def job(*args,&b)
   task(*args) do |t|
     unless b.nil?
-      job = Azkaban::Rb::JobFile.new(t, ".job")
+      job = Azkaban::JobFile.new(t, ".job")
       job.instance_eval(&b)
       job.write
     end
