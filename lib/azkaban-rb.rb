@@ -1,8 +1,8 @@
-$:.unshift(File.dirname(__FILE__)) unless
-  $:.include?(File.dirname(__FILE__)) || $:.include?(File.expand_path(File.dirname(__FILE__)))
+require "azkaban-rb/version"
+require "azkaban-rb/tasks"
 
-require 'azkaban-job'
-
-module AzkabanRb
-  VERSION = '0.0.3'
+module Azkaban
+  module Rb
+    # Your code goes here...
+  end
 end
