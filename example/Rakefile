@@ -1,0 +1,76 @@
+$:.unshift(File.expand_path('../lib/'))
+
+require 'azkaban-rb'
+require 'yaml'
+
+raise 'need config.yml' unless File.exists?('config.yml')
+
+config = YAML.load(File.read('config.yml'))
+
+@@job_namespace = 'azkaban-rb-test'
+@@user_name = config["user_name"]
+@@hdfs_root = "/user/#{@@user_name}"
+@@zip_name = "#{@@job_namespace}.zip"
+@@azkaban_path = @@job_namespace
+
+Azkaban::JobFile.output_dir = "jobs/"
+
+job_dir = "job"
+
+desc "Remove all generated files"
+task :clean_job_conf do
+  `rm -rf #{Azkaban::JobFile.output_dir}` if File.exists? Azkaban::JobFile.output_dir
+end
+
+props :base do
+  set "udf.import.list" => "oink.,com.linkedin.pig.,com.linkedin.pig.date.,org.apache.pig.piggybank.,com.linkedin.pig.characters."  
+  set "hadoop.job.ugi" => "#{@@user_name},hadoop"    
+  set "hdfs.default.classpath.dir" => config["hdfs_classpath"]  
+  set "jvm.args" => config["jvm_args"] if config["jvm_args"]
+  set "classpath" => "pig-0.9.0-core.jar,hadoop-lzo-0.4.9.jar"  
+  set "param.job_root" => @@hdfs_root
+end
+
+namespace @@job_namespace.to_sym do
+  
+  job :test do
+    set "type" => "pig",
+        "read.lock" => "#{@@hdfs_root}/input.txt",
+        "write.lock" => "#{@@hdfs_root}/input_grouped.txt",
+        "pig.script" => "src/test.pig"
+  end
+  
+  job :test2 => :test do
+    set "type" => "pig",
+        "read.lock" => "#{@@hdfs_root}/input_grouped.txt",
+        "write.lock" => "#{@@hdfs_root}/input_ordered.txt",
+        "pig.script" => "src/test2.pig"
+  end
+  
+  job :all => :test2 do
+    set "type"=>"command",
+        "command"=>'echo "Running the final job"'
+  end
+end
+
+task :clean_job_dir do
+  `rm -rf #{job_dir}` if File.exists? "#{job_dir}"
+end
+
+task :clean => [:clean_job_conf,:clean_job_dir] do
+  `rm -rf #{@@zip_name}`
+end
+
+task :zip => [:clean, :base, "#{@@job_namespace}:all".to_sym] do
+  `mkdir #{job_dir}`
+  `cp #{Azkaban::JobFile.output_dir}/* #{job_dir}`
+  `cp *.jar #{job_dir}`
+  `cp -r src #{job_dir}/src`
+  `cd #{job_dir}; zip -r #{@@zip_name} *; cd ..; mv #{job_dir}/#{@@zip_name} .`
+end
+
+task :deploy => :zip do
+  Azkaban.deploy(config['azkaban_uri'], @@azkaban_path, @@zip_name)
+end
+
+task :default => :zip
