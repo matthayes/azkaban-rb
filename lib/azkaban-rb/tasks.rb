@@ -64,6 +64,8 @@ module Azkaban
       @task = task
       @ext = ext
       @args = {}
+      @read_locks = []
+      @write_locks = []
     end
 
     class << self
@@ -74,6 +76,16 @@ module Azkaban
       params.each do |k,v|
         @args[k] = v
       end
+    end
+
+    def reads(name, *options)    
+      @read_locks << name
+      handle_read_write_options(options, name)
+    end
+    
+    def writes(name, *options)
+      @write_locks << name
+      handle_read_write_options(options, name)
     end
 
     def write
@@ -94,11 +106,24 @@ module Azkaban
 
     private 
 
+    def handle_read_write_options(options, name)
+      options = options[0] if options.size > 0
+      if options && options.instance_of?(Hash) && options[:as]
+        set "param.#{options[:as]}" => name
+      end
+    end
+
     def create_properties_file(file_name, props)
       unless File.exists? Azkaban::JobFile.output_dir
         Dir.mkdir Azkaban::JobFile.output_dir
       end
       file = File.new(Azkaban::JobFile.output_dir + file_name, "w+")
+      if @read_locks && @read_locks.size > 0
+        file.write("read.lock=#{@read_locks.join(",")}\n")
+      end
+      if @write_locks && @write_locks.size > 0
+        file.write("write.lock=#{@write_locks.join(",")}\n")
+      end
       props.each do |k,v|
         file.write("#{k}=#{v}\n")
       end

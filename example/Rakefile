@@ -34,16 +34,16 @@ end
 namespace @@job_namespace.to_sym do
   
   job :test do
+    reads "#{@@hdfs_root}/input.txt", :as => "input"
+    writes "#{@@hdfs_root}/input_grouped.txt", :as => "output"
     set "type" => "pig",
-        "read.lock" => "#{@@hdfs_root}/input.txt",
-        "write.lock" => "#{@@hdfs_root}/input_grouped.txt",
         "pig.script" => "src/test.pig"
   end
   
   job :test2 => :test do
+    reads "#{@@hdfs_root}/input_grouped.txt", :as => "input"
+    writes "#{@@hdfs_root}/input_ordered.txt", :as => "output"
     set "type" => "pig",
-        "read.lock" => "#{@@hdfs_root}/input_grouped.txt",
-        "write.lock" => "#{@@hdfs_root}/input_ordered.txt",
         "pig.script" => "src/test2.pig"
   end
   
