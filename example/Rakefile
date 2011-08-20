@@ -33,23 +33,20 @@ end
 
 namespace @@job_namespace.to_sym do
   
-  job :test do
+  pig_job :test do
+    uses "src/test.pig"
     reads "#{@@hdfs_root}/input.txt", :as => "input"
     writes "#{@@hdfs_root}/input_grouped.txt", :as => "output"
-    set "type" => "pig",
-        "pig.script" => "src/test.pig"
   end
-  
-  job :test2 => :test do
+    
+  pig_job :test2 => :test do
+    uses "src/test2.pig"
     reads "#{@@hdfs_root}/input_grouped.txt", :as => "input"
-    writes "#{@@hdfs_root}/input_ordered.txt", :as => "output"
-    set "type" => "pig",
-        "pig.script" => "src/test2.pig"
+    writes "#{@@hdfs_root}/input_ordered.txt", :as => "output"    
   end
   
-  job :all => :test2 do |t|
-    set "type"=>"command",
-        "command"=>'echo "Running the final job"'
+  command_job :all => :test2 do
+    uses 'echo "Running the final job"'
   end
 end
 

@@ -63,7 +63,7 @@ module Azkaban
   HTTP::Message.mime_type_handler = Proc.new { |path| Azkaban::mime_type_handler(path) }
 
   class JobFile
-    attr_reader :read_locks, :write_locks, :task
+    attr_reader :read_locks, :write_locks, :task, :uses
 
     @output_dir = "conf/"
 
@@ -138,7 +138,50 @@ module Azkaban
       file.close
     end
   end
+  
+  class PigJob < JobFile
+    def initialize(task, ext)
+      super(task,ext)
+      set "type"=>"pig"
+    end
+    
+    def uses(name)
+      set "pig.script"=>name
+    end
+  end
+  
+  class JavaJob < JobFile
+    def initialize(task, ext)
+      super(task,ext)
+      set "type"=>"java"
+    end
+    
+    def uses(name)
+      set "job.class"=>name
+    end
+  end
 
+  class JavaProcessJob < JobFile    
+    def initialize(task, ext)
+      super(task,ext)
+      set "type"=>"java"
+    end
+    
+    def uses(name)
+      set "java.class"=>name
+    end
+  end
+
+  class CommandJob < JobFile    
+    def initialize(task, ext)
+      super(task,ext)
+      set "type"=>"command"
+    end
+    
+    def uses(text)
+      set "command"=>text
+    end
+  end
 end
 
 def props(*args, &b)
@@ -152,7 +195,27 @@ def props(*args, &b)
 end
 
 def job(*args,&b)  
-  job = Azkaban::JobFile.new(task(*args) { job.write }, ".job")
+  make_job(Azkaban::JobFile, args, b)
+end
+
+def pig_job(*args,&b) 
+  make_job(Azkaban::PigJob, args, b)
+end
+
+def java_job(*args,&b) 
+  make_job(Azkaban::JavaJob, args, b)
+end
+
+def java_process_job(*args,&b) 
+  make_job(Azkaban::JavaProcessJob, args, b)
+end
+
+def command_job(*args,&b) 
+  make_job(Azkaban::CommandJob, args, b)
+end
+
+def make_job(job_class,args,b)
+  job = job_class.new(task(*args) { job.write }, ".job")
   unless b.nil?    
     job.instance_eval(&b)
   end
