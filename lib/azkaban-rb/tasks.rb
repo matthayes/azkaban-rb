@@ -1,5 +1,11 @@
 require 'httpclient'
 
+module Rake
+  class Task
+    attr_accessor :job
+  end
+end
+
 module Azkaban
     
   def self.deploy(uri, path, zip_file)
@@ -57,10 +63,12 @@ module Azkaban
   HTTP::Message.mime_type_handler = Proc.new { |path| Azkaban::mime_type_handler(path) }
 
   class JobFile
+    attr_reader :read_locks, :write_locks, :task
 
     @output_dir = "conf/"
 
     def initialize(task, ext)
+      task.job = self
       @task = task
       @ext = ext
       @args = {}
@@ -143,12 +151,9 @@ def props(*args, &b)
   end
 end
 
-def job(*args,&b)
-  task(*args) do |t|
-    unless b.nil?
-      job = Azkaban::JobFile.new(t, ".job")
-      job.instance_eval(&b)
-      job.write
-    end
+def job(*args,&b)  
+  job = Azkaban::JobFile.new(task(*args) { job.write }, ".job")
+  unless b.nil?    
+    job.instance_eval(&b)
   end
 end

@@ -47,7 +47,7 @@ namespace @@job_namespace.to_sym do
         "pig.script" => "src/test2.pig"
   end
   
-  job :all => :test2 do
+  job :all => :test2 do |t|
     set "type"=>"command",
         "command"=>'echo "Running the final job"'
   end
