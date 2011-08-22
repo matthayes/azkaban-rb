@@ -1,5 +1,6 @@
 require "azkaban-rb/version"
 require "azkaban-rb/tasks"
+require "azkaban-rb/visualization"
 
 module Azkaban
   module Rb

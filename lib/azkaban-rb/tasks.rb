@@ -63,7 +63,7 @@ module Azkaban
   HTTP::Message.mime_type_handler = Proc.new { |path| Azkaban::mime_type_handler(path) }
 
   class JobFile
-    attr_reader :read_locks, :write_locks, :task, :uses
+    attr_reader :read_locks, :write_locks, :task, :uses_arg
 
     @output_dir = "conf/"
 
@@ -146,6 +146,7 @@ module Azkaban
     end
     
     def uses(name)
+      @uses_arg = name
       set "pig.script"=>name
     end
   end
@@ -157,6 +158,7 @@ module Azkaban
     end
     
     def uses(name)
+      @uses_arg = name
       set "job.class"=>name
     end
   end
@@ -168,6 +170,7 @@ module Azkaban
     end
     
     def uses(name)
+      @uses_arg = name
       set "java.class"=>name
     end
   end
@@ -179,6 +182,7 @@ module Azkaban
     end
     
     def uses(text)
+      @uses_arg = text
       set "command"=>text
     end
   end
