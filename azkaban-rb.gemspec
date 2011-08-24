@@ -19,4 +19,5 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
   
   s.add_dependency "httpclient", "~> 2.1.6"
+  s.add_dependency "GraphvizR", "~> 0.5.1"
 end

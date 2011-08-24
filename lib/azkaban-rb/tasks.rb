@@ -79,6 +79,14 @@ module Azkaban
     class << self
       attr_accessor :output_dir
     end
+    
+    def [](k)
+      @args[k]
+    end
+    
+    def []=(k,v)
+      @args[k] = v
+    end
 
     def set(params)
       params.each do |k,v|
@@ -115,10 +123,7 @@ module Azkaban
     private 
 
     def handle_read_write_options(options, name)
-      options = options[0] if options.size > 0
-      if options && options.instance_of?(Hash) && options[:as]
-        set "param.#{options[:as]}" => name
-      end
+      # nothing to do
     end
 
     def create_properties_file(file_name, props)
@@ -140,14 +145,26 @@ module Azkaban
   end
   
   class PigJob < JobFile
+    attr_reader :parameters
+    
     def initialize(task, ext)
       super(task,ext)
       set "type"=>"pig"
+      @parameters = {}
     end
     
     def uses(name)
       @uses_arg = name
       set "pig.script"=>name
+    end
+    
+    def handle_read_write_options(options, name)
+      options = options[0] if options.size > 0
+      if options && options.instance_of?(Hash) && options[:as]
+        # set the pig parameter
+        set "param.#{options[:as]}" => name
+        @parameters[options[:as]] = name
+      end
     end
   end
   

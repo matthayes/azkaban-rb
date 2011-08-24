@@ -38,7 +38,7 @@ namespace @@job_namespace.to_sym do
     reads "#{@@hdfs_root}/input.txt", :as => "input"
     writes "#{@@hdfs_root}/input_grouped.txt", :as => "output"
   end
-    
+      
   pig_job :test2 => :test do
     uses "src/test2.pig"
     reads "#{@@hdfs_root}/input_grouped.txt", :as => "input"
@@ -72,7 +72,21 @@ end
 
 task :default => :zip
 
+desc "Visualize the data flow (requires GraphViz installed)"
 task :visualize do
   rakeGraph = RakeGraph.new
   rakeGraph.visualize("ExampleAzkabanDataflow", "example_azkaban_dataflow.png")
 end
+
+# Create a run task for each pig job so we can run using Rake.  Parameter substituion is done automatically.
+Rake.application.tasks.find_all do |task|
+  if task.job && task.job.instance_of?(Azkaban::PigJob)
+    desc "Run pig job #{task.name}"
+    task("run:#{task.name}".to_sym) do
+      script = task.job["pig.script"]
+      parameters = task.job.parameters.map { |k,v| "-param #{k}=#{v}"}.join(" ")
+      `bin/pig #{parameters} #{script}`
+    end
+  end
+end
+
