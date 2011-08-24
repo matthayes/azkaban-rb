@@ -1,13 +1,13 @@
 require 'graphviz_r'
 
 class RakeGraph
-  @@icon_base = '/Users/wvaughan/Workspaces/azkaban-rb/lib/icons'
-  attr_reader :graph, :tasks, :jobs
-
-  def initialize
+  attr_reader :tasks
+  
+  def initialize(namespaces = nil)
+    @namespaces = namespaces
     @tasks = {}
-    Rake.application.tasks.find_all{ |task| not task.job.nil?}.each do |task|
-      tasks[RakeGraph.task_name(task)] = task
+    Rake.application.tasks.find_all{ |task| (not task.job.nil?)}.each do |task|
+      tasks[RakeGraph.task_name(task)] = task if (task.job.read_locks.size + task.job.write_locks.size) > 0
     end
     @nodes = {}
     @edges = []
@@ -15,38 +15,64 @@ class RakeGraph
   end
   
   def RakeGraph.task_name(task)
-    task_name = "#{task}"
-    task_name = "#{task}".gsub(@@job_namespace+":", '') unless @@job_namespace.nil?
+    task_name = "TASK#{task}"
+    task_name = task_name.gsub(/[^0-9a-z ]/i, '')
     return task_name
   end
   
   def RakeGraph.data_name(name)
-    name = name.gsub('/', '_')
-    name, ext = name.partition('.')
+    name = "DATA"+name.gsub(/[^0-9a-z ]/i, '')
     return name
   end
   
+  def task_in_namespace(task)
+    return true if @namespaces.nil? or @namespaces.size == 0
+    return (task.scope & @namespaces).size > 0
+  end
+  
+  def find_prereq(task, prereq)    
+    scopes = Array.new(task.scope)
+    while prereq.start_with? '^'
+      scopes.pop
+      prereq.slice!(0)
+    end
+    return RakeGraph.task_name(scopes.join('')+prereq)
+  end
+  
   def construct_graph()
+    # first add all of the task nodes
     @tasks.each do |task_name, task|
+      next unless task_in_namespace(task)        
       node = TaskNode.new(task)
       @nodes[node.name] = node
-      #find all prereq tasks
-      task.prerequisites.each do |prereq|
-        @edges << TaskEdge.new(prereq, node.name)
-      end
+    end
+    
+    # now add all of the edges and data nodes    
+    data_nodes = {}
+    @nodes.each do |name, node|
+      task = node.task
+      # find all prereq tasks
+      # task.prerequisites.each do |prereq|
+      #   prereq = find_prereq(task, prereq)
+      #   next unless @nodes.has_key?(prereq)
+      #   @edges << TaskEdge.new(prereq, node.name)
+      # end
       # find all data reads
       task.job.read_locks.each do |read_lock|
         data_name = RakeGraph.data_name(read_lock)
-        @nodes[data_name] = DataNode.new(read_lock) unless @nodes.has_key? data_name
+        data_nodes[data_name] = DataNode.new(read_lock) unless data_nodes.has_key? data_name
         @edges << DataEdge.new(data_name, node.name)
       end
       # find all data writes
       task.job.write_locks.each do |write_lock|
         data_name = RakeGraph.data_name(write_lock)
-        @nodes[data_name] = DataNode.new(write_lock) unless @nodes.has_key? data_name
+        data_nodes[data_name] = DataNode.new(write_lock) unless data_nodes.has_key? data_name
         @edges << DataEdge.new(node.name, data_name)
       end
     end    
+    data_nodes.each do |key, value|
+      @nodes[key] = value
+    end
   end
   
   class Node
@@ -56,15 +82,14 @@ class RakeGraph
       @name = name
       @type = type
     end
-   
-    def label
-      return "#{@name}".to_sym
+    
+    def fontcolor
+      return '#000000'
     end
   
     def to_s
       return "#{@type}: #{@name}"
     end
-
   end
   
   class TaskNode < Node
@@ -76,33 +101,46 @@ class RakeGraph
     end
     
     def label
-      label = "<<table border='0' cellpadding='0' cellwidth='0'>
-        <tr><td>#{@name}</td></tr>
-        <tr><td>#{@type}</td></tr>"
-      label += "<tr><td>#{@task.job.uses_arg}</td></tr>" unless @type == 'Azkaban::CommandJob'
-      label += "</table>>"
+      label = "<#{@task}<br/>#{@task.job.uses_arg}>"
       return label.to_sym
     end
-    
     
     def shape
       return :ellipse
     end
+    
+    def fillcolor
+      case @type
+        when 'Azkaban::PigJob'
+          return '#e7a5a5'
+        when 'Azkaban::JavaJob'
+          return '#E7C6A5'
+        when 'Azkaban::CommandJob'
+          return '#e7e6a5'
+      end
+      return ""
+    end
   end
   
   class DataNode < Node
+    attr_reader :filename
+    
     def initialize(filename)
       super(RakeGraph.data_name(filename), "data")
       @filename = filename
     end
     
     def label
-      name = @filename.gsub(@@hdfs_root+"/", '') unless @@hdfs_root.nil?
-      return "<#{name}>".to_sym
+      label = @filename
+      return "<#{label}>".to_sym
     end
     
     def shape
       return :box
+    end
+    
+    def fillcolor
+      return '#d2e3f3'
     end
   end
   
@@ -124,12 +162,20 @@ class RakeGraph
       super(source, dest)
       @type = "task"
     end
+    
+    def style
+      return :dotted
+    end
   end
   
   class DataEdge < Edge
     def initialize(source, dest)
       super(source, dest)
       @type = "data"
+    end
+    
+    def style
+      :solid
     end
   end
   
@@ -143,13 +189,33 @@ class RakeGraph
   
   def add_nodes(g)
     @nodes.each do |name, node|
-      g[name] [:label => node.label, :shape => node.shape]
+      g[name] [:label => @label_block.nil? ? node.label : @label_block.call(node), 
+        :shape => @shape_block.nil? ? node.shape : @shape_block.call(node),
+        :fillcolor => @fillcolor_block.nil? ? node.fillcolor : @fillcolor_block.call(node),
+        :style => :filled, 
+        :fontcolor => @fontcolor_block.nil? ? node.fontcolor : @fontcolor_block.call(node)]
     end
   end
   
   def add_edges(g)
     @edges.each do |edge|
-      g[edge.source]>>g[edge.dest]
+      (g[edge.source]>>g[edge.dest])[:style => edge.style]
     end
+  end
+  
+  def set_label(&block)
+    @label_block = block
+  end
+  
+  def set_fillcolor(&block)
+    @fillcolor_block = block
+  end
+  
+  def set_fontcolor(&block)
+    @fontcolor_block = block
+  end
+  
+  def set_shape(&block)
+    @shape_block = block
   end
 end

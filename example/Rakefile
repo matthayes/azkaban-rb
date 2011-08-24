@@ -23,7 +23,7 @@ task :clean_job_conf do
 end
 
 props :base do
-  set "udf.import.list" => "oink.,com.linkedin.pig.,com.linkedin.pig.date.,org.apache.pig.piggybank.,com.linkedin.pig.characters."  
+  set "udf.import.list" => "oink.,org.apache.pig.piggybank."  
   set "hadoop.job.ugi" => "#{@@user_name},hadoop"    
   set "hdfs.default.classpath.dir" => config["hdfs_classpath"]  
   set "jvm.args" => config["jvm_args"] if config["jvm_args"]
@@ -73,5 +73,6 @@ end
 task :default => :zip
 
 task :visualize do
-  rakeGraph = RakeGraph.new.visualize("AzkabanDataflow", "azkaban_dataflow.png")
+  rakeGraph = RakeGraph.new
+  rakeGraph.visualize("ExampleAzkabanDataflow", "example_azkaban_dataflow.png")
 end
