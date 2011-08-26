@@ -5,7 +5,7 @@ require "azkaban-rb/version"
 Gem::Specification.new do |s|
   s.name        = "azkaban-rb"
   s.version     = Azkaban::Rb::VERSION
-  s.authors     = ["Matt Hayes"]
+  s.authors     = ["Matt Hayes","William Vaughan"]
   s.email       = ["matthew.terence.hayes@gmail.com"]
   s.homepage    = "https://github.com/matthayes/azkaban-rb"
   s.summary     = %q{Azkaban job generation using Ruby}

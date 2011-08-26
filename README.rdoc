@@ -1,0 +1,142 @@
+= azkaban-rb
+
+== Description
+
+{Azkaban}[http://sna-projects.com/azkaban/] is a batch job scheduler developed at LinkedIn for running Hadoop jobs.  Azkaban makes it very simple to construct workflows.  A workflow is just a collection of job files, with each job file being a definition of how to run it, what other jobs are prerequisites, what files it reads and writes, etc.  
+
+Workflows become difficult to maintain as the complexity and number of jobs grow.  <tt>azkaban-rb</tt> helps solve this problem by providing a simple Ruby DSL to generate Azkaban job files.
+
+== Installation
+
+Install the gem:
+
+  gem install azkaban-rb
+
+Optionally you can also install {GraphViz}[http://www.graphviz.org/Download..php] if you plan to generate directed graph visualizations of the data flow within the job.
+
+== What does an Azkaban job file look like?
+
+The Azkaban {documentation}[http://sna-projects.com/azkaban/documentation.php] has a lot of great information on the types of jobs and what parameters can be provided.
+
+A simple Azkaban job might look a lot like the one below.  
+
+  type=pig
+  read.lock=input_file.txt
+  write.lock=output_file.txt
+  pig.script=test.pig
+  param.input=input_file.txt
+  param.output=output_file.txt
+
+The <tt>type</tt> parameter says that this is a pig job.  There are also parameters defining read and write locks on the files the job will be accessing.  Azkaban makes sure that other jobs won't access the same files in ways that would violate the locks.  It also declares what pig script should be run.  Finally it declares some parameters to the pig script itself.  Within the pig script <tt>$input</tt> and <tt>$output</tt> can be used to reference the files.
+
+Already you can see that we have some duplication.  Each of the files are listed twice.  This problem gets worse as we add more input files.  We'll also add some dependencies to complete the example.
+  
+  type=pig
+  read.lock=input_file1.txt,input_file2.txt,input_file3.txt,input_file4.txt
+  write.lock=output_file.txt
+  pig.script=test.pig
+  param.input1=input_file1.txt
+  param.input2=input_file2.txt
+  param.input3=input_file3.txt
+  param.input4=input_file4.txt
+  param.output=output_file.txt
+  dependencies=job1,job2,job3
+
+== How does azkaban-rb work?
+
+With <tt>azkaban-rb</tt> the jobs are declared in a <tt>Rakefile</tt>.  One could generate the job file above with the following declaration:
+
+  job :test do
+    set "type" => "pig",
+        "read.lock" => "input_file1.txt,input_file2.txt,input_file3.txt,input_file4.txt",
+        "write.lock" => "output_file.txt",
+        "pig.script" => "test.pig",
+        "param.input1" => "input_file1.txt",
+        "param.input2" => "input_file2.txt",
+        "param.input3" => "input_file3.txt",
+        "param.input4" => "input_file4.txt",
+        "param.output" => "output_file.txt",
+        "dependencies" => "job1,job2,job3"
+  end
+
+This example just serves to show that you have complete control over what goes into the job file.  The real benefit of <tt>azkaban-rb</tt> comes from using its helper methods:
+
+  pig_job :test => [:job1, :job2, :job3] do
+    uses "test.pig"
+    reads "input_file1.txt", :as => :input1
+    reads "input_file2.txt", :as => :input2
+    reads "input_file3.txt", :as => :input3
+    reads "input_file4.txt", :as => :input4
+    writes "output_file.txt", :as => :output
+  end
+
+This declaration is a lot more readable.  <tt>pig_job</tt> is just a wrapper around <tt>job</tt> which implicitly sets the job type to "pig".  The <tt>reads</tt> and <tt>writes</tt> methods will add the given files to lists which will get read and write locks, respectively.  With the <tt>:as</tt> option appended to the call each will also define an alias which can be used to reference the file name in the pig script.  The other interesting thing going on here is the dependencies have been moved to the top of the declaration.  Before we discuss this let's talk about what we're really doing in this declaration.
+
+So what is really happening when you invoke <tt>pig_job</tt>?  <tt>azkaban-rb</tt> is built on top of {rake}[http://rake.rubyforge.org/], a Ruby build tool somewhat similar to make.  A <tt>Rakefile</tt> uses Ruby syntax to declare tasks and their prerequisites.  A job declared with <tt>azkaban-rb</tt> is actually no more than a rake task which generates an Azkaban job file when it executes.  The parameters you set within the block are used when creating the job file.
+
+Now back to those dependencies.  What we are actually doing is declaring task prerequisites using the rake syntax.  Since each job is just a rake task, it means one or more jobs can be defined as prerequisites.  There are two benefits to this.  First, rake will ensure that all prerequisites of a task are executed, which for us means that all the Azkaban jobs that a job depends on will be generated.  Second, the dependencies of the job can be implicitly extracted from the list of prerequisites defined using the rake syntax.  This means we don't need to ever set the dependencies.
+
+<tt>rake</tt> is a natural fit in the declaration of Azkaban workflows:
+
+* It's Ruby, so you programmatically have a lot of flexibility in how jobs are generated.
+* Jobs can be declared in a single <tt>Rakefile</tt> and namespaced for better organization.  Or you can group related jobs into separate Ruby files which are then loaded by the Rakefile.
+* Using JRuby one can import ant targets, which might be used to build Java MapReduce jobs.
+* Tasks can be set up in such a way that in a single rake command the Azkaban jobs are generated, Java code is built, and a zip archive of the entire workflow is produced and uploaded to the Azkaban server.
+
+== Declaring jobs
+
+<tt>azkaban-rb</tt> provides a set of built in methods for declaring Azkaban jobs.  Each of these is just a wrapper around the job method which implicitly sets the job type for you.
+
+=== Pig jobs
+
+A pig job has type "pig" and is declared with the <tt>pig_job</tt> method:
+
+  pig_job :test do
+    uses "test.pig" 
+    # set other parameters
+  end
+
+=== Java process jobs
+
+A java process job has type "javaprocess" and is declared with the <tt>java_process_job</tt> method:
+
+  java_process_job :test do
+    uses "azkaban.example.test.HelloWorld" # class having main method to execute
+    # set other parameters
+  end
+
+=== Command jobs
+
+A command job has type "command" and is declared with the <tt>command_job</tt> method:
+
+  command_job :test do
+    uses 'echo "Hello Azkaban!"'
+    # set other parameters
+  end
+
+=== Java jobs
+
+A java job has type "java" and is declared with the <tt>java_job</tt> method:
+
+  java_job :test do
+    uses "com.example.MyJob" # class for Hadoop job to execute
+    # set other parameters
+  end
+
+== Example
+
+A fully functional example can be found in the {source code}[https://github.com/matthayes/azkaban-rb/tree/master/example].
+
+== License
+
+Copyright 2010 LinkedIn, Inc
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License. You may obtain a copy of
+the License at http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
