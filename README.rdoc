@@ -85,11 +85,9 @@ Now back to those dependencies.  What we are actually doing is declaring task pr
 
 == Declaring jobs
 
-<tt>azkaban-rb</tt> provides a set of built in methods for declaring Azkaban jobs.  Each of these is just a wrapper around the job method which implicitly sets the job type for you.
+<tt>azkaban-rb</tt> provides a set of built in methods for declaring Azkaban jobs.  Each of these is just a wrapper around the <tt>job</tt> method which implicitly sets the job type for you.
 
 === Pig jobs
-
-A pig job has type "pig" and is declared with the <tt>pig_job</tt> method:
 
   pig_job :test do
     uses "test.pig" 
@@ -98,8 +96,6 @@ A pig job has type "pig" and is declared with the <tt>pig_job</tt> method:
 
 === Java process jobs
 
-A java process job has type "javaprocess" and is declared with the <tt>java_process_job</tt> method:
-
   java_process_job :test do
     uses "azkaban.example.test.HelloWorld" # class having main method to execute
     # set other parameters
@@ -107,16 +103,12 @@ A java process job has type "javaprocess" and is declared with the <tt>java_proc
 
 === Command jobs
 
-A command job has type "command" and is declared with the <tt>command_job</tt> method:
-
   command_job :test do
     uses 'echo "Hello Azkaban!"'
     # set other parameters
   end
 
 === Java jobs
-
-A java job has type "java" and is declared with the <tt>java_job</tt> method:
 
   java_job :test do
     uses "com.example.MyJob" # class for Hadoop job to execute
