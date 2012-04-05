@@ -172,7 +172,7 @@ module Azkaban
       set "pig.script"=>name
     end
     
-    def parameter(name)
+    def parameter(params)
       params.each do |k,v|
         set "param.#{k}" => v
         @parameters[k] = v
