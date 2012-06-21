@@ -172,6 +172,13 @@ module Azkaban
       set "pig.script"=>name
     end
     
+    def parameter(params)
+      params.each do |k,v|
+        set "param.#{k}" => v
+        @parameters[k] = v
+      end
+    end
+
     def handle_read_write_options(options, name)
       options = options[0] if options.size > 0
       if options && options.instance_of?(Hash) && options[:as]
