@@ -87,7 +87,7 @@ module Azkaban
       @task = task
       @ext = ext
       @args = {}
-      @jvm_args = Azkaban::JobFile.default_jvm_args
+      @jvm_args = Azkaban::JobFile.default_jvm_args.clone
       @read_locks = []
       @write_locks = []
     end
@@ -149,10 +149,6 @@ module Azkaban
     end
 
     private 
-
-    #def codify_jvm_args
-    #  @args["jvm.args"] = @jvm_args.map { |key,value| "-D#{key}=#{value}"}.join(" ")
-    #end
 
     def handle_read_write_options(options, name)
       # nothing to do
