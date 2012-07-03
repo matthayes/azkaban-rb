@@ -77,8 +77,9 @@ module Azkaban
   HTTP::Message.mime_type_handler = Proc.new { |path| Azkaban::mime_type_handler(path) }
 
   class JobFile
-    attr_reader :read_locks, :write_locks, :task, :uses_arg
+    attr_reader :read_locks, :write_locks, :task, :uses_arg, :jvm_args
 
+    @default_jvm_args = {}
     @output_dir = "conf/"
 
     def initialize(task, ext)
@@ -86,12 +87,14 @@ module Azkaban
       @task = task
       @ext = ext
       @args = {}
+      @jvm_args = Azkaban::JobFile.default_jvm_args
       @read_locks = []
       @write_locks = []
     end
 
     class << self
       attr_accessor :output_dir
+      attr_accessor :default_jvm_args
     end
     
     def [](k)
@@ -105,6 +108,12 @@ module Azkaban
     def set(params)
       params.each do |k,v|
         @args[k] = v
+      end
+    end
+
+    def set_jvm(params)
+      params.each do |k,v|
+        @jvm_args[k] = v
       end
     end
 
@@ -129,12 +138,21 @@ module Azkaban
             prereq_task.name.gsub(":", "-")
           }.join(",")
         end
+        @args["jvm.args"] = codified_jvm_args
         create_properties_file(file_name, @args)
         puts "Created #{file_name}"
       end
     end
 
+    def codified_jvm_args
+      @jvm_args.map { |key,value| "-D#{key}=#{value}"}.join(" ")
+    end
+
     private 
+
+    #def codify_jvm_args
+    #  @args["jvm.args"] = @jvm_args.map { |key,value| "-D#{key}=#{value}"}.join(" ")
+    #end
 
     def handle_read_write_options(options, name)
       # nothing to do

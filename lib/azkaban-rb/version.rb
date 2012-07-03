@@ -14,6 +14,6 @@
 
 module Azkaban
   module Rb
-    VERSION = "0.0.7.1"
+    VERSION = "0.0.7.3"
   end
 end
