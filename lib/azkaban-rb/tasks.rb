@@ -81,14 +81,13 @@ module Azkaban
 
     @default_jvm_args = {}
     @output_dir = "conf/"
-    jvm_args_changed = false
 
     def initialize(task, ext)
       task.job = self
       @task = task
       @ext = ext
       @args = {}
-      @jvm_args = Azkaban::JobFile.default_jvm_args.clone
+      @jvm_args = nil
       @read_locks = []
       @write_locks = []
     end
@@ -113,7 +112,7 @@ module Azkaban
     end
 
     def set_jvm(params)
-      @jvm_args_changed = true
+      @jvm_args ||= Azkaban::JobFile.default_jvm_args.clone
       params.each do |k,v|
         @jvm_args[k] = v
       end
@@ -140,10 +139,12 @@ module Azkaban
             prereq_task.name.gsub(":", "-")
           }.join(",")
         end
-        if @args["jvm.args"] and @jvm_args_changed
+        if @args["jvm.args"] and not @jvm_args.nil?
           puts "WARNING: #{@task.name} both set 'jvm.args' and set_jvm have been referenced, using: set 'jvm.args' => #{@args["jvm.args"]}"
         end
-        @args["jvm.args"] ||= codified_jvm_args
+        if @jvm_args and @args["jvm.args"].nil?
+          @args["jvm.args"] = codified_jvm_args
+        end
         create_properties_file(file_name, @args)
         puts "Created #{file_name}"
       end
