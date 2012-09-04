@@ -111,8 +111,12 @@ module Azkaban
       end
     end
 
-    def set_jvm(params)
+    def init_jvm_args
       @jvm_args ||= Azkaban::JobFile.default_jvm_args.clone
+    end
+
+    def set_jvm(params)
+      init_jvm_args
       params.each do |k,v|
         @jvm_args[k] = v
       end
@@ -126,6 +130,19 @@ module Azkaban
     def writes(name, *options)
       @write_locks << name
       handle_read_write_options(options, name)
+    end
+
+    def caches(filename, options)
+      set_jvm "mapred.create.symlink" => "yes"
+      reads filename
+      symlink = options[:as]
+      cache_link = "#{filename}##{symlink}"
+      init_jvm_args
+      if @jvm_args.has_key?('mapred.cache.files')
+        @jvm_args['mapred.cache.files'] += ","+cache_link
+      else 
+        set_jvm 'mapred.cache.files' => cache_link
+      end
     end
 
     def write
