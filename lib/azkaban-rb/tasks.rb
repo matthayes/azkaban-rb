@@ -236,6 +236,14 @@ module Azkaban
       @uses_arg = name
       set "job.class"=>name
     end
+
+    def handle_read_write_options(options, name)
+      options = options[0] if options.size > 0
+      if options && options.instance_of?(Hash) && options[:as]
+        # set the parameter
+        set "#{options[:as]}" => name
+      end
+    end
   end
 
   class JavaProcessJob < JobFile    
