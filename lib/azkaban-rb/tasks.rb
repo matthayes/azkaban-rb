@@ -69,7 +69,7 @@ module Azkaban
       puts "Successfully authenticated to Azkaban2"
       return body["session.id"]
     else
-      puts "Failed to authenticate to Azkaban2"
+      raise "Failed to authenticate to Azkaban2"
       return nil
     end
   end
