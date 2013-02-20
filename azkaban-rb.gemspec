@@ -20,4 +20,5 @@ Gem::Specification.new do |s|
   
   s.add_dependency "httpclient", "~> 2.1.6"
   s.add_dependency "GraphvizR", "~> 0.5.1"
+  s.add_dependency "rest-client", "~> 1.6.7"
 end

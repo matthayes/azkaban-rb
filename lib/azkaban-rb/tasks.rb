@@ -13,6 +13,8 @@
 # the License.
 
 require 'httpclient'
+require 'uri'
+require 'rest-client'
 
 module Rake
   class Task
@@ -48,6 +50,44 @@ module Azkaban
       else
         raise "Failed to upload to Azkaban for unknown reason"
       end     
+    end
+  end
+
+  # Azkaban2 requires authentication
+  def self.auth(uri, username, password)
+    uri = URI.parse(uri)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+
+    body = { 'action' => 'login', 'username' => username, 'password' => password }
+    request = Net::HTTP::Post.new(uri.request_uri)
+    request.set_form_data(body)
+    result = http.request(request)
+    body = JSON.parse(result.body)
+    if body["status"] == "success"
+      puts "Successfully authenticated to Azkaban2"
+      return body["session.id"]
+    else
+      raise "Failed to authenticate to Azkaban2"
+      return nil
+    end
+  end
+  
+  # Azkaban 2 requires a project with project_name to already be created
+  def self.deploy_azkaban2(uri, project_name, zip_file, session_id)
+    File.open(zip_file) do |file|
+      body = { 'action' => 'upload', 'session.id' => session_id, 'project' => project_name, 'file' => file }
+      RestClient.post uri, body, :raw_response => true do |response, request, result, &block|
+        # Response messages will soon change, and this section will be updated
+        set_cookie_header = response.headers[:set_cookie]
+        set_cookie_data = set_cookie_header == nil ? "" : set_cookie_header[0].to_s
+        if set_cookie_data =~ /azkaban.failure.message/
+          raise "Failed to upload to Azkaban: #{set_cookie_data}"
+        else
+          puts "Successfully uploaded to Azkaban"
+        end     
+      end
     end
   end
 
