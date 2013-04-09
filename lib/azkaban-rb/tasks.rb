@@ -286,6 +286,13 @@ module Azkaban
     end
   end
 
+  class VoldemortBuildAndPushJob < JobFile    
+    def initialize(task, ext)
+      super(task,ext)
+      set "type"=>"VoldemortBuildAndPush"
+    end
+  end
+
   class JavaProcessJob < JobFile    
     def initialize(task, ext)
       super(task,ext)
