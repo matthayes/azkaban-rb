@@ -348,6 +348,10 @@ def command_job(*args,&b)
   make_job(Azkaban::CommandJob, args, b)
 end
 
+def voldemort_build_and_push(*args,&b)
+  make_job(Azkaban::VoldemortBuildAndPushJob, args, b)
+end
+
 def make_job(job_class,args,b)
   job = job_class.new(task(*args) { job.write }, ".job")
   unless b.nil?    
