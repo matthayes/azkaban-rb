@@ -289,7 +289,7 @@ module Azkaban
   class VoldemortBuildAndPushJob < JobFile    
     def initialize(task, ext)
       super(task,ext)
-      set "type"=>"VoldemortBuildAndPush"
+      set "type"=>"VoldemortBuildandPush"
     end
   end
 
