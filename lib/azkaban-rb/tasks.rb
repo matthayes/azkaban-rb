@@ -1,11 +1,11 @@
 # Copyright 2010 LinkedIn, Inc
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
 # the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -23,7 +23,7 @@ module Rake
 end
 
 module Azkaban
-    
+
   def self.deploy(uri, path, zip_file)
     client = HTTPClient.new
 
@@ -49,7 +49,7 @@ module Azkaban
         raise "Failed to upload to Azkaban: #{reason}"
       else
         raise "Failed to upload to Azkaban for unknown reason"
-      end     
+      end
     end
   end
 
@@ -73,7 +73,7 @@ module Azkaban
       return nil
     end
   end
-  
+
   # Azkaban 2 requires a project with project_name to already be created
   def self.deploy_azkaban2(uri, project_name, zip_file, session_id)
     File.open(zip_file) do |file|
@@ -86,7 +86,7 @@ module Azkaban
           raise "Failed to upload to Azkaban: #{set_cookie_data}"
         else
           puts "Successfully uploaded to Azkaban"
-        end     
+        end
       end
     end
   end
@@ -136,11 +136,11 @@ module Azkaban
       attr_accessor :output_dir
       attr_accessor :default_jvm_args
     end
-    
+
     def [](k)
       @args[k]
     end
-    
+
     def []=(k,v)
       @args[k] = v
     end
@@ -162,11 +162,11 @@ module Azkaban
       end
     end
 
-    def reads(name, *options)    
+    def reads(name, *options)
       @read_locks << name
       handle_read_write_options(options, name)
     end
-    
+
     def writes(name, *options)
       @write_locks << name
       handle_read_write_options(options, name)
@@ -180,7 +180,7 @@ module Azkaban
       init_jvm_args
       if @jvm_args.has_key?('mapred.cache.files')
         @jvm_args['mapred.cache.files'] += ","+cache_link
-      else 
+      else
         set_jvm 'mapred.cache.files' => cache_link
       end
     end
@@ -190,7 +190,7 @@ module Azkaban
         file_name = @task.name.gsub(":", "-") + @ext
         if @task.prerequisites.size > 0
           scope = @task.scope.map { |s| s.to_s }.join("-")
-          @args["dependencies"] = @task.prerequisites.map{ |p| 
+          @args["dependencies"] = @task.prerequisites.map{ |p|
             # look up the prerequisite in the scope of its task
             prereq_task = Rake.application.lookup(p, @task.scope)
             prereq_task.name.gsub(":", "-")
@@ -207,11 +207,11 @@ module Azkaban
       end
     end
 
-    def codified_jvm_args      
+    def codified_jvm_args
       @jvm_args.map { |key,value| "-D#{key}=#{value}"}.join(" ")
     end
 
-    private 
+    private
 
     def handle_read_write_options(options, name)
       # nothing to do
@@ -234,21 +234,21 @@ module Azkaban
       file.close
     end
   end
-  
+
   class PigJob < JobFile
     attr_reader :parameters
-    
+
     def initialize(task, ext)
       super(task,ext)
       set "type"=>"pig"
       @parameters = {}
     end
-    
+
     def uses(name)
       @uses_arg = name
       set "pig.script"=>name
     end
-    
+
     def parameter(params)
       params.each do |k,v|
         set "param.#{k}" => v
@@ -265,13 +265,20 @@ module Azkaban
       end
     end
   end
-  
+
+  class PigLiJob < PigJob
+    def initialize(task, ext)
+      super(task,ext)
+      set "type"=>"pigLi"
+    end
+  end
+
   class JavaJob < JobFile
     def initialize(task, ext)
       super(task,ext)
       set "type"=>"java"
     end
-    
+
     def uses(name)
       @uses_arg = name
       set "job.class"=>name
@@ -286,31 +293,31 @@ module Azkaban
     end
   end
 
-  class VoldemortBuildAndPushJob < JobFile    
+  class VoldemortBuildAndPushJob < JobFile
     def initialize(task, ext)
       super(task,ext)
       set "type"=>"VoldemortBuildandPush"
     end
   end
 
-  class JavaProcessJob < JobFile    
+  class JavaProcessJob < JobFile
     def initialize(task, ext)
       super(task,ext)
       set "type"=>"java"
     end
-    
+
     def uses(name)
       @uses_arg = name
       set "java.class"=>name
     end
   end
 
-  class CommandJob < JobFile    
+  class CommandJob < JobFile
     def initialize(task, ext)
       super(task,ext)
       set "type"=>"command"
     end
-    
+
     def uses(text)
       @uses_arg = text
       set "command"=>text
@@ -328,23 +335,27 @@ def props(*args, &b)
   end
 end
 
-def job(*args,&b)  
+def job(*args,&b)
   make_job(Azkaban::JobFile, args, b)
 end
 
-def pig_job(*args,&b) 
+def pig_job(*args,&b)
   make_job(Azkaban::PigJob, args, b)
 end
 
-def java_job(*args,&b) 
+def pigLi_job(*args,&b)
+  make_job(Azkaban::PigLiJob, args, b)
+end
+
+def java_job(*args,&b)
   make_job(Azkaban::JavaJob, args, b)
 end
 
-def java_process_job(*args,&b) 
+def java_process_job(*args,&b)
   make_job(Azkaban::JavaProcessJob, args, b)
 end
 
-def command_job(*args,&b) 
+def command_job(*args,&b)
   make_job(Azkaban::CommandJob, args, b)
 end
 
@@ -354,7 +365,7 @@ end
 
 def make_job(job_class,args,b)
   job = job_class.new(task(*args) { job.write }, ".job")
-  unless b.nil?    
+  unless b.nil?
     job.instance_eval(&b)
   end
 end
